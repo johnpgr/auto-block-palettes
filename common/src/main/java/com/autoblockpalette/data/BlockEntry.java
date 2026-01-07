@@ -14,7 +14,7 @@ public record BlockEntry(@NotNull String blockId, int weight) {
      * Compact constructor that validates the weight is non-negative.
      */
     public BlockEntry {
-        if (blockId == null || blockId.isBlank()) {
+        if (blockId.isBlank()) {
             throw new IllegalArgumentException("Block ID cannot be null or blank");
         }
         if (weight < 0) {

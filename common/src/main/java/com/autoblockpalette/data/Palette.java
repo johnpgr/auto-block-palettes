@@ -16,11 +16,8 @@ import org.jetbrains.annotations.NotNull;
  *                  GUI/HUD
  * @param blocks    Map of block IDs to their selection weights
  */
-public record Palette(
-        @NotNull UUID id,
-        @NotNull String name,
-        @NotNull String iconBlock,
-        @NotNull Map<String, Integer> blocks) {
+public record Palette(@NotNull UUID id, @NotNull String name, @NotNull String iconBlock,
+                      @NotNull Map<String, Integer> blocks) {
 
     /**
      * Creates a new Palette with a generated UUID and validation.
@@ -31,10 +28,7 @@ public record Palette(
      * @return A new validated Palette instance with a generated UUID
      * @throws IllegalArgumentException if validation fails
      */
-    public static Palette create(
-            @NotNull String name,
-            @NotNull String iconBlock,
-            @NotNull Map<String, Integer> blocks) {
+    public static Palette create(@NotNull String name, @NotNull String iconBlock, @NotNull Map<String, Integer> blocks) {
         return create(UUID.randomUUID(), name, iconBlock, blocks);
     }
 
@@ -48,11 +42,7 @@ public record Palette(
      * @return A new validated Palette instance
      * @throws IllegalArgumentException if validation fails
      */
-    public static Palette create(
-            @NotNull UUID id,
-            @NotNull String name,
-            @NotNull String iconBlock,
-            @NotNull Map<String, Integer> blocks) {
+    public static Palette create(@NotNull UUID id, @NotNull String name, @NotNull String iconBlock, @NotNull Map<String, Integer> blocks) {
         if (name.isBlank()) {
             throw new IllegalArgumentException("Palette name cannot be blank");
         }
@@ -91,10 +81,7 @@ public record Palette(
      * @return The sum of all positive weights
      */
     public int getTotalWeight() {
-        return blocks.values().stream()
-                .filter(w -> w > 0)
-                .mapToInt(Integer::intValue)
-                .sum();
+        return blocks.values().stream().filter(w -> w > 0).mapToInt(Integer::intValue).sum();
     }
 
     /**
@@ -103,8 +90,6 @@ public record Palette(
      * @return The number of enabled blocks
      */
     public int getEnabledBlockCount() {
-        return (int) blocks.values().stream()
-                .filter(w -> w > 0)
-                .count();
+        return (int) blocks.values().stream().filter(w -> w > 0).count();
     }
 }
