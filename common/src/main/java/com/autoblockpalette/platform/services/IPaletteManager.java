@@ -2,6 +2,7 @@ package com.autoblockpalette.platform.services;
 
 import com.autoblockpalette.data.Palette;
 import com.autoblockpalette.data.PaletteData;
+import com.autoblockpalette.util.Result;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -115,11 +116,10 @@ public interface IPaletteManager {
      * The duplicate is added to the end of the palettes list.
      *
      * @param id The UUID of the palette to duplicate
-     * @return Optional containing the new PaletteData if the source palette
-     *         existed,
-     *         or empty if no palette with the given ID exists
+     * @return Result containing the new PaletteData if successful,
+     *         or an error message if the palette was not found or creation failed
      */
-    Optional<PaletteData> duplicatePalette(UUID id);
+    Result<PaletteData> duplicatePalette(UUID id);
 
     // ==================== Active Palette Management ====================
 
@@ -148,22 +148,6 @@ public interface IPaletteManager {
      */
     PaletteData clearActivePalette();
 
-    // ==================== Organization ====================
-
-    /**
-     * Reorders a palette to a new position in the list.
-     * 
-     * <p>
-     * The new index is clamped to the valid range [0, palettes.size()-1].
-     * The active palette state is preserved (same UUID remains active if it was
-     * active).
-     *
-     * @param id       The UUID of the palette to move
-     * @param newIndex The target index (will be clamped to valid range)
-     * @return Optional containing the new PaletteData if the palette existed,
-     *         or empty if no palette with the given ID exists
-     */
-    Optional<PaletteData> reorderPalette(UUID id, int newIndex);
 
     // ==================== Observer Pattern ====================
 

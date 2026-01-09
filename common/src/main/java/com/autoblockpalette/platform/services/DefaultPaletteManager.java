@@ -2,10 +2,10 @@ package com.autoblockpalette.platform.services;
 
 import com.autoblockpalette.data.Palette;
 import com.autoblockpalette.data.PaletteData;
+import com.autoblockpalette.util.Result;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Optional;
+import java.util.SequencedMap;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -55,11 +55,11 @@ public class DefaultPaletteManager implements IPaletteManager {
     public PaletteData addPalette(Palette palette) {
         PaletteData oldState = state;
 
-        // Add palette to end of list
-        List<Palette> newPalettes = new ArrayList<>(oldState.palettes());
-        newPalettes.add(palette);
+        // Add palette to end of map
+        SequencedMap<UUID, Palette> newPalettes = oldState.palettesMap();
+        newPalettes.put(palette.id(), palette);
 
-        PaletteData newState = new PaletteData(List.copyOf(newPalettes), oldState.activePaletteId());
+        PaletteData newState = new PaletteData(newPalettes, oldState.activePaletteId());
         setState(newState, oldState);
 
         return newState;
@@ -69,17 +69,16 @@ public class DefaultPaletteManager implements IPaletteManager {
     public Optional<PaletteData> replacePalette(Palette palette) {
         PaletteData oldState = state;
 
-        // Find the palette index by UUID
-        int index = findPaletteIndex(oldState, palette.id());
-        if (index < 0) {
+        // Check if palette exists (O(1) lookup)
+        if (!oldState.hasPalette(palette.id())) {
             return Optional.empty();
         }
 
-        // Replace palette at same index
-        List<Palette> newPalettes = new ArrayList<>(oldState.palettes());
-        newPalettes.set(index, palette);
+        // Replace palette in map (preserves order)
+        SequencedMap<UUID, Palette> newPalettes = oldState.palettesMap();
+        newPalettes.put(palette.id(), palette);
 
-        PaletteData newState = new PaletteData(List.copyOf(newPalettes), oldState.activePaletteId());
+        PaletteData newState = new PaletteData(newPalettes, oldState.activePaletteId());
         setState(newState, oldState);
 
         return Optional.of(newState);
@@ -89,15 +88,14 @@ public class DefaultPaletteManager implements IPaletteManager {
     public Optional<PaletteData> deletePalette(UUID id) {
         PaletteData oldState = state;
 
-        // Find the palette index
-        int index = findPaletteIndex(oldState, id);
-        if (index < 0) {
+        // Check if palette exists (O(1) lookup)
+        if (!oldState.hasPalette(id)) {
             return Optional.empty();
         }
 
-        // Remove palette from list
-        List<Palette> newPalettes = new ArrayList<>(oldState.palettes());
-        newPalettes.remove(index);
+        // Remove palette from map
+        SequencedMap<UUID, Palette> newPalettes = oldState.palettesMap();
+        newPalettes.remove(id);
 
         // Clear active palette if the deleted one was active
         UUID newActivePaletteId = oldState.activePaletteId();
@@ -105,39 +103,45 @@ public class DefaultPaletteManager implements IPaletteManager {
             newActivePaletteId = null;
         }
 
-        PaletteData newState = new PaletteData(List.copyOf(newPalettes), newActivePaletteId);
+        PaletteData newState = new PaletteData(newPalettes, newActivePaletteId);
         setState(newState, oldState);
 
         return Optional.of(newState);
     }
 
     @Override
-    public Optional<PaletteData> duplicatePalette(UUID id) {
+    public Result<PaletteData> duplicatePalette(UUID id) {
         PaletteData oldState = state;
 
         // Find source palette
         Optional<Palette> sourcePaletteOpt = oldState.findById(id);
         if (sourcePaletteOpt.isEmpty()) {
-            return Optional.empty();
+            return Result.error("Palette not found: " + id);
         }
 
         Palette sourcePalette = sourcePaletteOpt.get();
 
         // Create duplicate with new UUID and "(Copy)" suffix
-        Palette duplicatedPalette = Palette.create(
+        Result<Palette> result = Palette.create(
                 UUID.randomUUID(),
                 sourcePalette.name() + " (Copy)",
                 sourcePalette.iconBlock(),
                 sourcePalette.blocks());
 
-        // Add to end of list
-        List<Palette> newPalettes = new ArrayList<>(oldState.palettes());
-        newPalettes.add(duplicatedPalette);
+        if (result instanceof Result.Error<Palette>(String message)) {
+            return Result.error(message);
+        }
 
-        PaletteData newState = new PaletteData(List.copyOf(newPalettes), oldState.activePaletteId());
+        Palette duplicatedPalette = result.getOrThrow();
+
+        // Add to end of map
+        SequencedMap<UUID, Palette> newPalettes = oldState.palettesMap();
+        newPalettes.put(duplicatedPalette.id(), duplicatedPalette);
+
+        PaletteData newState = new PaletteData(newPalettes, oldState.activePaletteId());
         setState(newState, oldState);
 
-        return Optional.of(newState);
+        return Result.success(newState);
     }
 
     // ==================== Active Palette Management ====================
@@ -159,7 +163,7 @@ public class DefaultPaletteManager implements IPaletteManager {
             newActivePaletteId = id;
         }
 
-        PaletteData newState = new PaletteData(oldState.palettes(), newActivePaletteId);
+        PaletteData newState = new PaletteData(oldState.palettesMap(), newActivePaletteId);
         setState(newState, oldState);
 
         return newState;
@@ -174,44 +178,12 @@ public class DefaultPaletteManager implements IPaletteManager {
             return oldState;
         }
 
-        PaletteData newState = new PaletteData(oldState.palettes(), null);
+        PaletteData newState = new PaletteData(oldState.palettesMap(), null);
         setState(newState, oldState);
 
         return newState;
     }
 
-    // ==================== Organization ====================
-
-    @Override
-    public Optional<PaletteData> reorderPalette(UUID id, int newIndex) {
-        PaletteData oldState = state;
-
-        // Find the palette index
-        int currentIndex = findPaletteIndex(oldState, id);
-        if (currentIndex < 0) {
-            return Optional.empty();
-        }
-
-        List<Palette> palettes = oldState.palettes();
-
-        // Clamp newIndex to valid range [0, palettes.size()-1]
-        int clampedIndex = Math.max(0, Math.min(newIndex, palettes.size() - 1));
-
-        // No change needed if already at target position
-        if (currentIndex == clampedIndex) {
-            return Optional.of(oldState);
-        }
-
-        // Remove from current position and insert at new position
-        List<Palette> newPalettes = new ArrayList<>(palettes);
-        Palette palette = newPalettes.remove(currentIndex);
-        newPalettes.add(clampedIndex, palette);
-
-        PaletteData newState = new PaletteData(List.copyOf(newPalettes), oldState.activePaletteId());
-        setState(newState, oldState);
-
-        return Optional.of(newState);
-    }
 
     // ==================== Observer Pattern ====================
 
@@ -266,22 +238,5 @@ public class DefaultPaletteManager implements IPaletteManager {
                 // This prevents a misbehaving listener from breaking other notifications
             }
         }
-    }
-
-    /**
-     * Finds the index of a palette by its UUID.
-     *
-     * @param data The palette data to search
-     * @param id   The UUID to find
-     * @return The index of the palette, or -1 if not found
-     */
-    private int findPaletteIndex(PaletteData data, UUID id) {
-        List<Palette> palettes = data.palettes();
-        for (int i = 0; i < palettes.size(); i++) {
-            if (palettes.get(i).id().equals(id)) {
-                return i;
-            }
-        }
-        return -1;
     }
 }

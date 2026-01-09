@@ -3,6 +3,7 @@ package com.autoblockpalette.data;
 import java.util.Map;
 import java.util.UUID;
 
+import com.autoblockpalette.util.Result;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -25,10 +26,9 @@ public record Palette(@NotNull UUID id, @NotNull String name, @NotNull String ic
      * @param name      The palette name (required)
      * @param iconBlock The icon block ID (required)
      * @param blocks    The blocks map (must contain at least 1 entry)
-     * @return A new validated Palette instance with a generated UUID
-     * @throws IllegalArgumentException if validation fails
+     * @return A Result containing either the validated Palette or an error message
      */
-    public static Palette create(@NotNull String name, @NotNull String iconBlock, @NotNull Map<String, Integer> blocks) {
+    public static Result<Palette> create(@NotNull String name, @NotNull String iconBlock, @NotNull Map<String, Integer> blocks) {
         return create(UUID.randomUUID(), name, iconBlock, blocks);
     }
 
@@ -39,20 +39,19 @@ public record Palette(@NotNull UUID id, @NotNull String name, @NotNull String ic
      * @param name      The palette name (required)
      * @param iconBlock The icon block ID (required)
      * @param blocks    The blocks map (must contain at least 1 entry)
-     * @return A new validated Palette instance
-     * @throws IllegalArgumentException if validation fails
+     * @return A Result containing either the validated Palette or an error message
      */
-    public static Palette create(@NotNull UUID id, @NotNull String name, @NotNull String iconBlock, @NotNull Map<String, Integer> blocks) {
+    public static Result<Palette> create(@NotNull UUID id, @NotNull String name, @NotNull String iconBlock, @NotNull Map<String, Integer> blocks) {
         if (name.isBlank()) {
-            throw new IllegalArgumentException("Palette name cannot be blank");
+            return Result.error("Palette name cannot be blank");
         }
         if (iconBlock.isBlank()) {
-            throw new IllegalArgumentException("Icon block cannot be blank");
+            return Result.error("Icon block cannot be blank");
         }
         if (blocks.isEmpty()) {
-            throw new IllegalArgumentException("Palette must contain at least one block");
+            return Result.error("Palette must contain at least one block");
         }
-        return new Palette(id, name, iconBlock, Map.copyOf(blocks));
+        return Result.success(new Palette(id, name, iconBlock, Map.copyOf(blocks)));
     }
 
     /**
